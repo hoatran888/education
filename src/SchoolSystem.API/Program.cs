@@ -71,13 +71,14 @@ var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
+// Always enable Swagger when no real Azure SQL is configured (local dev/testing)
+var isLocalDev = string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("AzureSQL"))
+              || builder.Configuration.GetConnectionString("AzureSQL")!.Contains("your-server");
 
-    await SchoolSystem.Infrastructure.Data.Seed.DatabaseSeeder.SeedAsync(app.Services);
-}
+app.UseSwagger();
+app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "SchoolSystem API v1"));
+
+await SchoolSystem.Infrastructure.Data.Seed.DatabaseSeeder.SeedAsync(app.Services);
 
 app.UseHttpsRedirection();
 app.UseCors();
