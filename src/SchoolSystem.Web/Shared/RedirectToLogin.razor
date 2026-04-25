@@ -1,11 +1,18 @@
 @inject NavigationManager Navigation
+@inject IConfiguration    Configuration
 
 @code {
     protected override void OnInitialized()
     {
+        var b2cClientId = Configuration["AzureAdB2C:ClientId"];
+        var isRealB2C   = !string.IsNullOrWhiteSpace(b2cClientId)
+                       && b2cClientId != "00000000-0000-0000-0000-000000000000";
+
         var returnUrl = Uri.EscapeDataString(Navigation.Uri);
-        Navigation.NavigateTo(
-            $"MicrosoftIdentity/Account/SignIn?returnUrl={returnUrl}",
-            forceLoad: true);
+
+        if (isRealB2C)
+            Navigation.NavigateTo($"MicrosoftIdentity/Account/SignIn?returnUrl={returnUrl}", forceLoad: true);
+        else
+            Navigation.NavigateTo($"/dev-login?returnUrl={returnUrl}", forceLoad: true);
     }
 }

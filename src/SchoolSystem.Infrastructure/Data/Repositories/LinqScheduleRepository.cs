@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SchoolSystem.Domain.Models.Entities;
 using SchoolSystem.Domain.Models.ValueObjects;
 using SchoolSystem.Infrastructure.Data.Context;
@@ -17,36 +18,54 @@ public class LinqScheduleRepository
             Table.Where(s => s.SchoolId == _schoolId && s.ScheduleId == scheduleId), ct);
 
     public async Task<IReadOnlyList<Schedule>> GetByCourseAsync(
-        Guid courseId, CancellationToken ct = default) =>
-        await ToListAsync(
-            Table.Where(s => s.SchoolId == _schoolId && s.CourseId == courseId)
-                 .OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime), ct);
+        Guid courseId, CancellationToken ct = default)
+    {
+        var rows = await Table
+            .Where(s => s.SchoolId == _schoolId && s.CourseId == courseId)
+            .OrderBy(s => s.DayOfWeek)
+            .ToListAsync(ct);
+        return rows.OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime)
+                   .Select(MapToDomain).ToList();
+    }
 
     public async Task<IReadOnlyList<Schedule>> GetByRoomAsync(
-        Guid roomId, DateTime date, CancellationToken ct = default) =>
-        await ToListAsync(
-            Table.Where(s => s.SchoolId     == _schoolId &&
-                             s.RoomId        == roomId    &&
-                             s.EffectiveFrom <= date       &&
-                             s.EffectiveTo   >= date)
-                 .OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime), ct);
+        Guid roomId, DateTime date, CancellationToken ct = default)
+    {
+        var rows = await Table
+            .Where(s => s.SchoolId     == _schoolId &&
+                        s.RoomId        == roomId    &&
+                        s.EffectiveFrom <= date       &&
+                        s.EffectiveTo   >= date)
+            .OrderBy(s => s.DayOfWeek)
+            .ToListAsync(ct);
+        return rows.OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime)
+                   .Select(MapToDomain).ToList();
+    }
 
     public async Task<IReadOnlyList<Schedule>> GetByTeacherAsync(
-        Guid teacherUserId, CancellationToken ct = default) =>
-        await ToListAsync(
-            Table.Where(s => s.SchoolId == _schoolId && s.TeacherUserId == teacherUserId)
-                 .OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime), ct);
+        Guid teacherUserId, CancellationToken ct = default)
+    {
+        var rows = await Table
+            .Where(s => s.SchoolId == _schoolId && s.TeacherUserId == teacherUserId)
+            .OrderBy(s => s.DayOfWeek)
+            .ToListAsync(ct);
+        return rows.OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime)
+                   .Select(MapToDomain).ToList();
+    }
 
     public async Task<IReadOnlyList<Schedule>> GetByMonthAsync(
         int month, int year, CancellationToken ct = default)
     {
         var monthStart = new DateTime(year, month, 1);
         var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
-        return await ToListAsync(
-            Table.Where(s => s.SchoolId     == _schoolId &&
-                             s.EffectiveFrom <= monthEnd   &&
-                             s.EffectiveTo   >= monthStart)
-                 .OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime), ct);
+        var rows = await Table
+            .Where(s => s.SchoolId     == _schoolId &&
+                        s.EffectiveFrom <= monthEnd   &&
+                        s.EffectiveTo   >= monthStart)
+            .OrderBy(s => s.DayOfWeek)
+            .ToListAsync(ct);
+        return rows.OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime)
+                   .Select(MapToDomain).ToList();
     }
 
     public async Task<bool> HasRoomConflictAsync(

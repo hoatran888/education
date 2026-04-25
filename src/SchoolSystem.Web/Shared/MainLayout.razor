@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject IConfiguration Configuration
 
 <MudThemeProvider />
 <MudDialogProvider />
@@ -13,8 +14,16 @@
         <AuthorizeView>
             <Authorized>
                 <MudText Typo="Typo.body2" Class="mr-2">@context.User.Identity?.Name</MudText>
-                <MudButton Href="MicrosoftIdentity/Account/SignOut"
-                           Variant="Variant.Text" Color="Color.Inherit">Sign out</MudButton>
+                @if (_isDevMode)
+                {
+                    <MudButton Href="/dev-login/signout"
+                               Variant="Variant.Text" Color="Color.Inherit">Switch User</MudButton>
+                }
+                else
+                {
+                    <MudButton Href="MicrosoftIdentity/Account/SignOut"
+                               Variant="Variant.Text" Color="Color.Inherit">Sign out</MudButton>
+                }
             </Authorized>
         </AuthorizeView>
     </MudAppBar>
@@ -32,5 +41,14 @@
 
 @code {
     bool _drawerOpen = true;
+    bool _isDevMode;
+
+    protected override void OnInitialized()
+    {
+        var b2cClientId = Configuration["AzureAdB2C:ClientId"];
+        _isDevMode = string.IsNullOrWhiteSpace(b2cClientId)
+                  || b2cClientId == "00000000-0000-0000-0000-000000000000";
+    }
+
     void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 }

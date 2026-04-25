@@ -1,13 +1,7 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using SchoolSystem.Infrastructure.Data.Seed;
-
 namespace SchoolSystem.Web.Services;
 
 /// <summary>
-/// Auto-signs in a dev admin user when B2C is not configured.
-/// This only runs when the app is in local dev mode (no real B2C tenant).
+/// Redirects unauthenticated requests to /dev-login when B2C is not configured.
 /// </summary>
 public class DevAutoLoginMiddleware
 {
@@ -17,22 +11,19 @@ public class DevAutoLoginMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!context.User.Identity?.IsAuthenticated ?? true)
+        if (!(context.User.Identity?.IsAuthenticated ?? false))
         {
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, DatabaseSeeder.DevAdminUserId.ToString()),
-                new("sub",                     DatabaseSeeder.DevAdminUserId.ToString()),
-                new(ClaimTypes.Name,           "Admin User"),
-                new(ClaimTypes.Email,          "admin@greenwood.edu"),
-                new("email",                   "admin@greenwood.edu"),
-                new("school_id",               DatabaseSeeder.DevSchoolId.ToString()),
-            };
-            var identity  = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
+            var path = context.Request.Path.Value ?? "";
 
-            await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
-            context.User = principal;
+            // Let the dev-login controller handle its own routes
+            if (!path.StartsWith("/dev-login", StringComparison.OrdinalIgnoreCase) &&
+                !path.StartsWith("/_blazor",  StringComparison.OrdinalIgnoreCase) &&
+                !path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase))
+            {
+                var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
+                context.Response.Redirect($"/dev-login?returnUrl={returnUrl}");
+                return;
+            }
         }
 
         await _next(context);

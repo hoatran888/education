@@ -4,22 +4,27 @@
 
     <MudDivider Class="my-2" />
 
-    <MudNavGroup Title="Administration" Icon="@Icons.Material.Filled.AdminPanelSettings"
-                 Expanded="true">
-        <MudNavLink Href="/schools"  Icon="@Icons.Material.Filled.Business">Schools</MudNavLink>
-        <MudNavLink Href="/users"    Icon="@Icons.Material.Filled.People">Users</MudNavLink>
-    </MudNavGroup>
+    <AuthorizeView Roles="SuperAdmin,Admin" Context="adminCtx">
+        <MudNavGroup Title="Administration" Icon="@Icons.Material.Filled.AdminPanelSettings"
+                     Expanded="true">
+            <MudNavLink Href="/schools" Icon="@Icons.Material.Filled.Business">Schools</MudNavLink>
+            <MudNavLink Href="/users"   Icon="@Icons.Material.Filled.People">Users</MudNavLink>
+        </MudNavGroup>
+    </AuthorizeView>
 
-    <MudNavGroup Title="Academic" Icon="@Icons.Material.Filled.School" Expanded="true">
-        <MudNavLink Href="/teachers"  Icon="@Icons.Material.Filled.Person">Teachers</MudNavLink>
-        <MudNavLink Href="/students"  Icon="@Icons.Material.Filled.Face">Students</MudNavLink>
-        <MudNavLink Href="/courses"   Icon="@Icons.Material.Filled.Book">Courses</MudNavLink>
-        <MudNavLink Href="/schedules" Icon="@Icons.Material.Filled.CalendarMonth">Schedules</MudNavLink>
-        <MudNavLink Href="/grades/entry"  Icon="@Icons.Material.Filled.Edit">Grade Entry</MudNavLink>
-    </MudNavGroup>
+    <AuthorizeView Roles="SuperAdmin,Admin,Teacher" Context="academicCtx">
+        <MudNavGroup Title="Academic" Icon="@Icons.Material.Filled.School" Expanded="true">
+            <MudNavLink Href="/teachers"    Icon="@Icons.Material.Filled.Person">Teachers</MudNavLink>
+            <MudNavLink Href="/students"    Icon="@Icons.Material.Filled.Face">Students</MudNavLink>
+            <MudNavLink Href="/courses"     Icon="@Icons.Material.Filled.Book">Courses</MudNavLink>
+            <MudNavLink Href="/schedules"   Icon="@Icons.Material.Filled.CalendarMonth">Schedules</MudNavLink>
+            <MudNavLink Href="/grades/entry" Icon="@Icons.Material.Filled.Edit">Grade Entry</MudNavLink>
+        </MudNavGroup>
+    </AuthorizeView>
 
-    <MudNavGroup Title="Finance" Icon="@Icons.Material.Filled.AccountBalance" Expanded="true">
-        <MudNavLink Href="/invoices" Icon="@Icons.Material.Filled.Receipt">Invoices</MudNavLink>
-        <MudNavLink Href="/payments" Icon="@Icons.Material.Filled.Payment">Payments</MudNavLink>
-    </MudNavGroup>
+    <AuthorizeView Roles="SuperAdmin,Admin,Parent" Context="financeCtx">
+        <MudNavGroup Title="Finance" Icon="@Icons.Material.Filled.AccountBalance" Expanded="true">
+            <MudNavLink Href="/invoices" Icon="@Icons.Material.Filled.Receipt">Invoices</MudNavLink>
+        </MudNavGroup>
+    </AuthorizeView>
 </MudNavMenu>
