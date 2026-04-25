@@ -1,0 +1,77 @@
+@page "/grades/report/{StudentUserId:guid}"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender           Sender
+@inject NavigationManager Nav
+
+<PageTitle>Student Report</PageTitle>
+<MudBreadcrumbs Items="_breadcrumbs" Class="mb-2" />
+<MudText Typo="Typo.h4" Class="mb-4">Grade Report</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_grades.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No published grades found for this student.</MudAlert>
+}
+else
+{
+    @foreach (var courseGroup in _grades.GroupBy(g => g.CourseName ?? "Unknown Course"))
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudText Typo="Typo.h6" Class="mb-2">@courseGroup.Key</MudText>
+            <MudTable Items="@courseGroup.ToList()" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Period</MudTh><MudTh>Score</MudTh><MudTh>Grade</MudTh><MudTh>Published</MudTh><MudTh>Comment</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@(context.PeriodName ?? "—")</MudTd>
+                    <MudTd>@context.Score.ToString("F1")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GradeColor(context.LetterGrade)">
+                            @context.LetterGrade
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@(context.PublishedAt?.ToString("MMM dd, yyyy") ?? "—")</MudTd>
+                    <MudTd>@(context.Comment ?? "—")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+
+    <MudPaper Class="pa-3 mt-2" Elevation="0">
+        <MudText Typo="Typo.body1">
+            <b>Overall Average:</b>
+            @(_grades.Count > 0 ? _grades.Average(g => g.Score).ToString("F2") : "—")
+        </MudText>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid StudentUserId { get; set; }
+
+    bool _loading = true;
+    IReadOnlyList<GradeDto> _grades = [];
+
+    List<BreadcrumbItem> _breadcrumbs =>
+    [
+        new("Students", "/students"),
+        new("Grade Report", null, disabled: true)
+    ];
+
+    protected override async Task InitializeAsync()
+    {
+        _grades  = await Sender.Send(new GetStudentReportQuery(StudentUserId));
+        _loading = false;
+    }
+
+    static Color GradeColor(string letter) => letter switch
+    {
+        "A" or "A+" or "A-" => Color.Success,
+        "B" or "B+" or "B-" => Color.Info,
+        "C" or "C+" or "C-" => Color.Warning,
+        _                   => Color.Error
+    };
+}

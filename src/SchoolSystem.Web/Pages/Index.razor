@@ -1,0 +1,121 @@
+@page "/"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender Sender
+
+<PageTitle>Dashboard</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-6">Dashboard</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.School" Color="Color.Primary" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h4">@_schoolCount</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Schools</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Secondary" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h4">@_userCount</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Users</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Face" Color="Color.Tertiary" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h4">@_studentCount</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Students</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Book" Color="Color.Success" Size="Size.Large" />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h4">@_openCourseCount</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Open Courses</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-6">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
+                <MudStack Spacing="2">
+                    <MudButton Href="/students"  Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PersonAdd"   FullWidth="true">Manage Students</MudButton>
+                    <MudButton Href="/courses"   Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.BookmarkAdd"  FullWidth="true">Manage Courses</MudButton>
+                    <MudButton Href="/grades/entry" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit"    FullWidth="true">Enter Grades</MudButton>
+                    <MudButton Href="/invoices"  Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Receipt"     FullWidth="true">View Invoices</MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Open Courses</MudText>
+                @foreach (var course in _openCourses.Take(5))
+                {
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Circle" IconColor="Color.Success">
+                        <MudText Typo="Typo.body2">@course.Name — Grade @course.GradeLevel</MudText>
+                    </MudListItem>
+                }
+                @if (_openCourses.Count > 5)
+                {
+                    <MudButton Href="/courses" Variant="Variant.Text" Size="Size.Small">View all @_openCourses.Count courses</MudButton>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    bool   _loading        = true;
+    int    _schoolCount    = 0;
+    int    _userCount      = 0;
+    int    _studentCount   = 0;
+    int    _openCourseCount = 0;
+    IReadOnlyList<CourseDto> _openCourses = [];
+
+    protected override async Task InitializeAsync()
+    {
+        try
+        {
+            var schools  = await Sender.Send(new GetAllSchoolsQuery());
+            var users    = await Sender.Send(new GetUsersByRoleQuery(UserRole.Student));
+            var students = await Sender.Send(new GetStudentsByGradeLevelQuery(0) with { GradeLevel = 1 });
+            _openCourses   = await Sender.Send(new GetOpenCoursesQuery());
+
+            _schoolCount     = schools.Count;
+            _userCount       = users.Count;
+            _openCourseCount = _openCourses.Count;
+
+            var allStudents = await Sender.Send(new GetUsersByRoleQuery(UserRole.Student));
+            _studentCount = allStudents.Count;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

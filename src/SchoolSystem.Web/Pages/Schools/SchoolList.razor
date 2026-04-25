@@ -1,0 +1,128 @@
+@page "/schools"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender   Sender
+@inject ISnackbar Snackbar
+
+<PageTitle>Schools</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Schools</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_showForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">@(_editing is null ? "Add School" : "Edit School")</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Name"    Label="School Name" Required="true" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Email"   Label="Email"       Required="true" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Phone"   Label="Phone"       Required="true" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Street"  Label="Street"      Required="true" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_form.City"    Label="City"        Required="true" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_form.State"   Label="State" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_form.ZipCode" Label="Zip Code" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_form.Country" Label="Country"     Required="true" /></MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save"   Disabled="_saving">
+                    @(_saving ? "Saving…" : "Save")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelForm">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_schools" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">School List</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreate" Disabled="_showForm">Add School</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>City</MudTh><MudTh>Active</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@context.Email</MudTd>
+            <MudTd>@context.City</MudTd>
+            <MudTd><MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">@(context.IsActive ? "Active" : "Inactive")</MudChip></MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                               OnClick="@(() => OpenEdit(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No schools found.</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    bool   _loading = true;
+    bool   _showForm = false;
+    bool   _saving   = false;
+    SchoolDto? _editing;
+    IReadOnlyList<SchoolDto> _schools = [];
+    SchoolFormModel _form = new();
+
+    protected override async Task InitializeAsync()
+    {
+        _schools = await Sender.Send(new GetAllSchoolsQuery());
+        _loading = false;
+    }
+
+    void OpenCreate()
+    {
+        _editing  = null;
+        _form     = new();
+        _showForm = true;
+    }
+
+    void OpenEdit(SchoolDto s)
+    {
+        _editing = s;
+        _form    = new() { Name = s.Name, Email = s.Email, Phone = s.Phone,
+                           Street = s.Street, City = s.City, State = s.State,
+                           ZipCode = s.ZipCode, Country = s.Country };
+        _showForm = true;
+    }
+
+    void CancelForm() { _showForm = false; _editing = null; }
+
+    async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            if (_editing is null)
+                await Sender.Send(new CreateSchoolCommand(_form.Name, _form.Street, _form.City,
+                    _form.State, _form.ZipCode, _form.Country, _form.Email, _form.Phone));
+            else
+                await Sender.Send(new UpdateSchoolCommand(_editing.SchoolId, _form.Name,
+                    _form.Street, _form.City, _form.State, _form.ZipCode, _form.Country,
+                    _form.Email, _form.Phone));
+
+            Snackbar.Add("Saved successfully.", Severity.Success);
+            _showForm = false;
+            _schools  = await Sender.Send(new GetAllSchoolsQuery());
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    class SchoolFormModel
+    {
+        public string Name    { get; set; } = "";
+        public string Email   { get; set; } = "";
+        public string Phone   { get; set; } = "";
+        public string Street  { get; set; } = "";
+        public string City    { get; set; } = "";
+        public string State   { get; set; } = "";
+        public string ZipCode { get; set; } = "";
+        public string Country { get; set; } = "";
+    }
+}

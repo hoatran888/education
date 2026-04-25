@@ -1,0 +1,181 @@
+@page "/courses"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender            Sender
+@inject ISnackbar          Snackbar
+@inject NavigationManager  Nav
+
+<PageTitle>Courses</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Courses</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_showForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Create Course</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="8"><MudTextField @bind-Value="_form.Name"        Label="Course Name"   Required="true" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField @bind-Value="_form.GradeLevel" Label="Grade Level" Min="1" Max="13" /></MudItem>
+                <MudItem xs="12">      <MudTextField @bind-Value="_form.Description"  Label="Description" Lines="2" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField @bind-Value="_form.Credits"    Label="Credits"     Min="1" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField @bind-Value="_form.MaxStudents" Label="Max Students" Min="1" /></MudItem>
+                <MudItem xs="12" md="3"><MudDatePicker  @bind-Date="_form.StartDate"  Label="Start Date" /></MudItem>
+                <MudItem xs="12" md="3"><MudDatePicker  @bind-Date="_form.EndDate"    Label="End Date" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField  @bind-Value="_form.AcademicYearId" Label="Academic Year ID (Guid)" /></MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateCourse" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Create")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _showForm = false)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_courses" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Course List</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => _showForm = true)" Disabled="_showForm">Add Course</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Name</MudTh><MudTh>Grade</MudTh><MudTh>Credits</MudTh><MudTh>Enrolled/Max</MudTh><MudTh>Status</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@context.GradeLevel</MudTd>
+            <MudTd>@context.Credits</MudTd>
+            <MudTd>@context.ActiveEnrollments / @context.MaxStudents</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.Status == "Open" ? Color.Success : context.Status == "Draft" ? Color.Warning : Color.Default)">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudButtonGroup Size="Size.Small" Variant="Variant.Text">
+                    <MudButton OnClick="@(() => Nav.NavigateTo($"/courses/{context.CourseId}/enrollments"))">Enrollments</MudButton>
+                    @if (context.Status == "Draft")
+                    {
+                        <MudButton Color="Color.Success" OnClick="@(() => OpenCourse(context.CourseId))">Open</MudButton>
+                    }
+                    @if (context.Status == "Open")
+                    {
+                        <MudButton Color="Color.Warning" OnClick="@(() => CloseCourse(context.CourseId))">Close</MudButton>
+                    }
+                    @if (context.TeacherUserId is null && context.Status != "Closed")
+                    {
+                        <MudButton OnClick="@(() => StartAssignTeacher(context.CourseId))">Assign Teacher</MudButton>
+                    }
+                </MudButtonGroup>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No courses found.</MudText></NoRecordsContent>
+    </MudTable>
+
+    @if (_assignTeacherCourseId.HasValue)
+    {
+        <MudPaper Class="pa-4 mt-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Assign Teacher</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_assignTeacherId" Label="Teacher" Required="true">
+                        @foreach (var t in _teachers)
+                        {
+                            <MudSelectItem Value="t.UserId">@t.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AssignTeacher">Assign</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _assignTeacherCourseId = null)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+}
+
+@code {
+    bool   _loading  = true;
+    bool   _showForm = false;
+    bool   _saving   = false;
+    Guid?  _assignTeacherCourseId;
+    Guid   _assignTeacherId;
+    IReadOnlyList<CourseDto>   _courses  = [];
+    IReadOnlyList<TeacherDto>  _teachers = [];
+    CourseFormModel _form = new();
+
+    protected override async Task InitializeAsync()
+    {
+        _courses  = await Sender.Send(new GetOpenCoursesQuery());
+        _teachers = await Sender.Send(new GetAllTeachersQuery());
+        _loading  = false;
+    }
+
+    async Task CreateCourse()
+    {
+        if (_form.StartDate is null || _form.EndDate is null)
+        { Snackbar.Add("Start and end dates are required.", Severity.Warning); return; }
+        if (!Guid.TryParse(_form.AcademicYearId, out var yearId))
+        { Snackbar.Add("Invalid Academic Year ID.", Severity.Warning); return; }
+        _saving = true;
+        try
+        {
+            await Sender.Send(new CreateCourseCommand(yearId, _form.Name, _form.Description,
+                _form.GradeLevel, _form.Credits, _form.MaxStudents,
+                DateOnly.FromDateTime(_form.StartDate.Value),
+                DateOnly.FromDateTime(_form.EndDate.Value)));
+            Snackbar.Add("Course created.", Severity.Success);
+            _showForm = false;
+            _courses = await Sender.Send(new GetOpenCoursesQuery());
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    async Task OpenCourse(Guid id)
+    {
+        try { await Sender.Send(new OpenCourseCommand(id)); Snackbar.Add("Course opened.", Severity.Success); _courses = await Sender.Send(new GetOpenCoursesQuery()); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    async Task CloseCourse(Guid id)
+    {
+        try { await Sender.Send(new CloseCourseCommand(id)); Snackbar.Add("Course closed.", Severity.Info); _courses = await Sender.Send(new GetOpenCoursesQuery()); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    void StartAssignTeacher(Guid courseId) { _assignTeacherCourseId = courseId; _assignTeacherId = Guid.Empty; }
+
+    async Task AssignTeacher()
+    {
+        if (_assignTeacherCourseId is null || _assignTeacherId == Guid.Empty) return;
+        try
+        {
+            await Sender.Send(new AssignTeacherToCourseCommand(_assignTeacherCourseId.Value, _assignTeacherId));
+            Snackbar.Add("Teacher assigned.", Severity.Success);
+            _assignTeacherCourseId = null;
+            _courses = await Sender.Send(new GetOpenCoursesQuery());
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    class CourseFormModel
+    {
+        public string    Name           { get; set; } = "";
+        public string?   Description    { get; set; }
+        public int       GradeLevel     { get; set; } = 1;
+        public int       Credits        { get; set; } = 1;
+        public int       MaxStudents    { get; set; } = 30;
+        public DateTime? StartDate      { get; set; }
+        public DateTime? EndDate        { get; set; }
+        public string    AcademicYearId { get; set; } = "";
+    }
+}

@@ -1,0 +1,16 @@
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.csproj.AssemblyReference.cache
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.AssemblyInfoInputs.cache
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.AssemblyInfo.cs
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.csproj.CoreCompileInputs.cache
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.sourcelink.json
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/bin/Debug/net8.0/SchoolSystem.Infrastructure.deps.json
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/bin/Debug/net8.0/SchoolSystem.Infrastructure.dll
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/bin/Debug/net8.0/SchoolSystem.Infrastructure.pdb
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/bin/Debug/net8.0/SchoolSystem.Domain.dll
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/bin/Debug/net8.0/SchoolSystem.Domain.pdb
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSy.F1753FB0.Up2Date
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.dll
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/refint/SchoolSystem.Infrastructure.dll
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/SchoolSystem.Infrastructure.pdb
+/Users/xuantran/Projects/education/src/SchoolSystem.Infrastructure/obj/Debug/net8.0/ref/SchoolSystem.Infrastructure.dll

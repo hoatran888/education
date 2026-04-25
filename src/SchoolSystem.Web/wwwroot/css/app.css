@@ -1,0 +1,14 @@
+html, body {
+    font-family: 'Roboto', sans-serif;
+}
+
+.mud-table-toolbar {
+    height: 64px;
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+}

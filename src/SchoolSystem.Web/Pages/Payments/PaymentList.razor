@@ -1,0 +1,198 @@
+@page "/payments/{InvoiceId:guid}"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender            Sender
+@inject ISnackbar          Snackbar
+@inject NavigationManager  Nav
+
+<PageTitle>Payments</PageTitle>
+<MudBreadcrumbs Items="_breadcrumbs" Class="mb-2" />
+<MudText Typo="Typo.h4" Class="mb-4">Payments</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_invoice is not null)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="6" md="3">
+                    <MudText Typo="Typo.caption">Student</MudText>
+                    <MudText Typo="Typo.body1">@_invoice.StudentUserId.ToString("N")[..8]…</MudText>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudText Typo="Typo.caption">Total</MudText>
+                    <MudText Typo="Typo.body1">@_invoice.Currency @_invoice.TotalAmount.ToString("F2")</MudText>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudText Typo="Typo.caption">Outstanding</MudText>
+                    <MudText Typo="Typo.body1" Color="@(_invoice.OutstandingBalance > 0 ? Color.Error : Color.Success)">
+                        @_invoice.Currency @_invoice.OutstandingBalance.ToString("F2")
+                    </MudText>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudText Typo="Typo.caption">Status</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@InvoiceStatusColor(_invoice.Status)">@_invoice.Status</MudChip>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+
+    @if (_showPayForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Record Payment</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="3">
+                    <MudNumericField @bind-Value="_form.Amount" Label="Amount" Min="0.01m" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudTextField @bind-Value="_form.Currency" Label="Currency" MaxLength="3" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect @bind-Value="_form.Method" T="PaymentMethod" Label="Method" Required="true">
+                        @foreach (PaymentMethod m in Enum.GetValues<PaymentMethod>())
+                        {
+                            <MudSelectItem Value="m">@m</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_form.Reference" Label="Reference #" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_form.ParentUserIdText" Label="Parent User ID (Guid)" />
+                </MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="RecordPayment" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Record")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _showPayForm = false)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_payments" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Payment History</MudText>
+            <MudSpacer />
+            @if (_invoice?.Status is "Sent" or "PartiallyPaid")
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => _showPayForm = true)" Disabled="_showPayForm">Add Payment</MudButton>
+            }
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Date</MudTh><MudTh>Amount</MudTh><MudTh>Method</MudTh><MudTh>Reference</MudTh><MudTh>Status</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.PaymentDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd>@context.Currency @context.Amount.ToString("F2")</MudTd>
+            <MudTd>@context.Method</MudTd>
+            <MudTd>@(string.IsNullOrEmpty(context.Reference) ? "—" : context.Reference)</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.Status == "Confirmed" ? Color.Success : Color.Warning)">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                @if (context.Status == "Pending")
+                {
+                    <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text"
+                               OnClick="@(() => ConfirmPayment(context.PaymentId))">Confirm</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No payments recorded.</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    [Parameter] public Guid InvoiceId { get; set; }
+
+    bool   _loading     = true;
+    bool   _showPayForm = false;
+    bool   _saving      = false;
+    InvoiceDto? _invoice;
+    IReadOnlyList<PaymentDto> _payments = [];
+    PaymentFormModel _form = new();
+
+    List<BreadcrumbItem> _breadcrumbs =>
+    [
+        new("Invoices", "/invoices"),
+        new("Payments", null, disabled: true)
+    ];
+
+    protected override async Task InitializeAsync()
+    {
+        _invoice  = await Sender.Send(new GetInvoiceByIdQuery(InvoiceId));
+        _payments = await Sender.Send(new GetPaymentsByInvoiceQuery(InvoiceId));
+        _loading  = false;
+    }
+
+    async Task RecordPayment()
+    {
+        if (_form.Amount <= 0) { Snackbar.Add("Amount must be greater than zero.", Severity.Warning); return; }
+        if (!Guid.TryParse(_form.ParentUserIdText, out var parentId))
+        { Snackbar.Add("Invalid Parent User ID.", Severity.Warning); return; }
+
+        _saving = true;
+        try
+        {
+            await Sender.Send(new RecordPaymentCommand(
+                InvoiceId,
+                parentId,
+                _form.Amount,
+                _form.Currency,
+                _form.Method,
+                _form.Reference ?? ""));
+            Snackbar.Add("Payment recorded.", Severity.Success);
+            _showPayForm = false;
+            _form = new();
+            await Reload();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    async Task ConfirmPayment(Guid paymentId)
+    {
+        try
+        {
+            await Sender.Send(new ConfirmPaymentCommand(paymentId));
+            Snackbar.Add("Payment confirmed.", Severity.Success);
+            await Reload();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    async Task Reload()
+    {
+        _invoice  = await Sender.Send(new GetInvoiceByIdQuery(InvoiceId));
+        _payments = await Sender.Send(new GetPaymentsByInvoiceQuery(InvoiceId));
+    }
+
+    static Color InvoiceStatusColor(string status) => status switch
+    {
+        "Paid"          => Color.Success,
+        "Sent"          => Color.Info,
+        "PartiallyPaid" => Color.Warning,
+        "Waived"        => Color.Warning,
+        _               => Color.Default
+    };
+
+    class PaymentFormModel
+    {
+        public decimal       Amount         { get; set; }
+        public string        Currency       { get; set; } = "USD";
+        public PaymentMethod Method         { get; set; } = PaymentMethod.Cash;
+        public string?       Reference      { get; set; }
+        public string        ParentUserIdText { get; set; } = "";
+    }
+}

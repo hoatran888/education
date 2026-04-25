@@ -1,0 +1,114 @@
+@page "/students"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender   Sender
+@inject ISnackbar Snackbar
+
+<PageTitle>Students</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Students</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_showForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Add Student Profile</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_form.UserId" Label="User" Required="true">
+                        @foreach (var u in _users)
+                        {
+                            <MudSelectItem Value="u.UserId">@u.FullName (@u.Email)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudNumericField @bind-Value="_form.GradeLevel" Label="Grade Level" Min="1" Max="13" Required="true" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudDatePicker @bind-Date="_form.BirthDate" Label="Birth Date" />
+                </MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Create" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Create")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _showForm = false)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_students" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Student List</MudText>
+            <MudSpacer />
+            <MudNumericField @bind-Value="_gradeFilter" Label="Grade" Min="0" Max="13" Style="width:100px"
+                             Class="mr-4" Clearable="true" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => _showForm = true)" Disabled="_showForm">Add Student</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>Grade</MudTh><MudTh>Age</MudTh><MudTh>Admission</MudTh><MudTh>Active</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.FullName</MudTd>
+            <MudTd>@context.Email</MudTd>
+            <MudTd>@context.GradeLevel</MudTd>
+            <MudTd>@context.Age</MudTd>
+            <MudTd>@context.AdmissionDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd><MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">@(context.IsActive ? "Active" : "Inactive")</MudChip></MudTd>
+            <MudTd>
+                <MudButton Href="@($"/grades/report/{context.UserId}")" Size="Size.Small" Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.Grade">Report</MudButton>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No students found.</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    bool   _loading     = true;
+    bool   _showForm    = false;
+    bool   _saving      = false;
+    int    _gradeFilter = 0;
+    IReadOnlyList<StudentDto> _students = [];
+    IReadOnlyList<UserDto>    _users    = [];
+    StudentFormModel _form = new();
+
+    protected override async Task InitializeAsync()
+    {
+        _students = await Sender.Send(new GetStudentsByGradeLevelQuery(1));
+        _users    = await Sender.Send(new GetUsersByRoleQuery(UserRole.Student));
+        _loading  = false;
+    }
+
+    async Task Create()
+    {
+        if (_form.BirthDate is null) { Snackbar.Add("Birth date is required.", Severity.Warning); return; }
+        _saving = true;
+        try
+        {
+            await Sender.Send(new CreateStudentProfileCommand(
+                _form.UserId,
+                DateOnly.FromDateTime(_form.BirthDate.Value),
+                _form.GradeLevel));
+            Snackbar.Add("Student profile created.", Severity.Success);
+            _showForm = false;
+            _students = await Sender.Send(new GetStudentsByGradeLevelQuery(_gradeFilter > 0 ? _gradeFilter : 1));
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    class StudentFormModel
+    {
+        public Guid       UserId     { get; set; }
+        public int        GradeLevel { get; set; } = 1;
+        public DateTime?  BirthDate  { get; set; }
+    }
+}

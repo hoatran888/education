@@ -1,0 +1,212 @@
+@page "/invoices"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender            Sender
+@inject ISnackbar          Snackbar
+@inject NavigationManager  Nav
+
+<PageTitle>Invoices</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Invoices</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_showCreateForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Create Invoice</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_form.StudentUserId" T="Guid" Label="Student" Required="true">
+                        @foreach (var s in _students)
+                        {
+                            <MudSelectItem Value="s.UserId">@s.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_form.ParentUserIdText" Label="Parent User ID (Guid)" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_form.AcademicYearIdText" Label="Academic Year ID (Guid)" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudDatePicker @bind-Date="_form.DueDate" Label="Due Date" Required="true" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudTextField @bind-Value="_form.Currency" Label="Currency" MaxLength="3" Placeholder="USD" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Line Items</MudText>
+                    @for (int i = 0; i < _form.Items.Count; i++)
+                    {
+                        int idx = i;
+                        <MudGrid Class="mb-1">
+                            <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Items[idx].Description" Label="Description" /></MudItem>
+                            <MudItem xs="12" md="3"><MudNumericField @bind-Value="_form.Items[idx].Amount" Label="Amount" Min="0" /></MudItem>
+                            <MudItem xs="12" md="3" Class="d-flex align-end">
+                                <MudIconButton Icon="@Icons.Material.Filled.RemoveCircle" Color="Color.Error"
+                                               OnClick="@(() => _form.Items.RemoveAt(idx))" />
+                            </MudItem>
+                        </MudGrid>
+                    }
+                    <MudButton StartIcon="@Icons.Material.Filled.AddCircle" Variant="Variant.Text"
+                               OnClick="@(() => _form.Items.Add(new()))">Add Item</MudButton>
+                </MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateInvoice" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Create")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _showCreateForm = false)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                <MudSelect @bind-Value="_filterStudentId" T="Guid" Label="Filter by Student">
+                    <MudSelectItem Value="Guid.Empty">— All —</MudSelectItem>
+                    @foreach (var s in _students)
+                    {
+                        <MudSelectItem Value="s.UserId">@s.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Outlined" OnClick="LoadInvoices">Search</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudTable Items="_invoices" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Invoice List</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => _showCreateForm = true)" Disabled="_showCreateForm">New Invoice</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Student</MudTh><MudTh>Total</MudTh><MudTh>Outstanding</MudTh><MudTh>Due</MudTh><MudTh>Status</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.StudentUserId.ToString("N")[..8]…</MudTd>
+            <MudTd>@context.Currency @context.TotalAmount.ToString("F2")</MudTd>
+            <MudTd>@context.Currency @context.OutstandingBalance.ToString("F2")</MudTd>
+            <MudTd>@context.DueDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@InvoiceStatusColor(context.Status)">@context.Status</MudChip>
+            </MudTd>
+            <MudTd>
+                <MudButtonGroup Size="Size.Small" Variant="Variant.Text">
+                    <MudButton OnClick="@(() => Nav.NavigateTo($"/payments/{context.InvoiceId}"))">Payments</MudButton>
+                    @if (context.Status == "Draft")
+                    {
+                        <MudButton Color="Color.Primary" OnClick="@(() => SendInvoice(context.InvoiceId))">Send</MudButton>
+                    }
+                    @if (context.Status != "Waived" && context.Status != "Paid")
+                    {
+                        <MudButton Color="Color.Warning" OnClick="@(() => WaiveInvoice(context.InvoiceId))">Waive</MudButton>
+                    }
+                </MudButtonGroup>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No invoices found.</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    bool   _loading         = true;
+    bool   _showCreateForm  = false;
+    bool   _saving          = false;
+    Guid   _filterStudentId = Guid.Empty;
+    IReadOnlyList<InvoiceDto> _invoices = [];
+    IReadOnlyList<StudentDto> _students = [];
+    InvoiceFormModel _form = new();
+
+    protected override async Task InitializeAsync()
+    {
+        _students = await Sender.Send(new GetStudentsByGradeLevelQuery(0));
+        _loading  = false;
+    }
+
+    async Task LoadInvoices()
+    {
+        if (_filterStudentId != Guid.Empty)
+            _invoices = await Sender.Send(new GetInvoicesByStudentQuery(_filterStudentId));
+    }
+
+    async Task CreateInvoice()
+    {
+        if (_form.DueDate is null) { Snackbar.Add("Due date is required.", Severity.Warning); return; }
+        if (_form.Items.Count == 0) { Snackbar.Add("Add at least one line item.", Severity.Warning); return; }
+        if (!Guid.TryParse(_form.ParentUserIdText, out var parentId))
+        { Snackbar.Add("Invalid Parent User ID.", Severity.Warning); return; }
+        if (!Guid.TryParse(_form.AcademicYearIdText, out var yearId))
+        { Snackbar.Add("Invalid Academic Year ID.", Severity.Warning); return; }
+
+        _saving = true;
+        try
+        {
+            var items = _form.Items
+                .Select(i => new InvoiceItemRequest(i.Description, i.Amount))
+                .ToList();
+            await Sender.Send(new CreateInvoiceCommand(
+                _form.StudentUserId,
+                parentId,
+                yearId,
+                DateOnly.FromDateTime(_form.DueDate.Value),
+                _form.Currency,
+                items));
+            Snackbar.Add("Invoice created.", Severity.Success);
+            _showCreateForm = false;
+            _form = new();
+            await LoadInvoices();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    async Task SendInvoice(Guid id)
+    {
+        try { await Sender.Send(new SendInvoiceCommand(id)); Snackbar.Add("Invoice sent.", Severity.Success); await LoadInvoices(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    async Task WaiveInvoice(Guid id)
+    {
+        try { await Sender.Send(new WaiveInvoiceCommand(id, "Waived by admin")); Snackbar.Add("Invoice waived.", Severity.Info); await LoadInvoices(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    static Color InvoiceStatusColor(string status) => status switch
+    {
+        "Paid"   => Color.Success,
+        "Sent"   => Color.Info,
+        "Draft"  => Color.Default,
+        "Waived" => Color.Warning,
+        _        => Color.Default
+    };
+
+    class InvoiceFormModel
+    {
+        public Guid       StudentUserId    { get; set; }
+        public string     ParentUserIdText { get; set; } = "";
+        public string     AcademicYearIdText { get; set; } = "";
+        public DateTime?  DueDate          { get; set; }
+        public string     Currency         { get; set; } = "USD";
+        public List<ItemModel> Items       { get; set; } = [];
+    }
+
+    class ItemModel
+    {
+        public string  Description { get; set; } = "";
+        public decimal Amount      { get; set; }
+    }
+}

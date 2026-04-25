@@ -1,0 +1,148 @@
+@page "/grades/entry"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender   Sender
+@inject ISnackbar Snackbar
+
+<PageTitle>Grade Entry</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Grade Entry</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                <MudSelect T="Guid" Value="_selectedCourseId" ValueChanged="OnCourseChanged"
+                           Label="Course" Required="true">
+                    @foreach (var c in _courses)
+                    {
+                        <MudSelectItem Value="c.CourseId">@c.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="5">
+                <MudTextField @bind-Value="_gradePeriodId" Label="Grade Period ID (Guid)" />
+            </MudItem>
+            <MudItem xs="12" md="2" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" FullWidth="true"
+                           OnClick="LoadEnrollments" Disabled="_selectedCourseId == Guid.Empty">Load</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_rows.Count > 0)
+    {
+        <MudTable Items="_rows" Hover="true" Striped="true" Elevation="2">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Students</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           OnClick="SaveAll" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Save All Grades")
+                </MudButton>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Student</MudTh><MudTh Style="width:140px">Score</MudTh><MudTh>Comment</MudTh><MudTh Style="width:120px">Existing</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.EnrollmentId.ToString("N")[..8]…</MudTd>
+                <MudTd><MudNumericField @bind-Value="context.Score" Min="0" Max="100" HideSpinButtons="true" /></MudTd>
+                <MudTd><MudTextField @bind-Value="context.Comment" Placeholder="Optional" /></MudTd>
+                <MudTd>
+                    @if (context.ExistingGradeId.HasValue)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.ExistingScore</MudChip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">—</MudText>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    bool   _loading  = true;
+    bool   _saving   = false;
+    Guid   _selectedCourseId;
+    string _gradePeriodId = "";
+    IReadOnlyList<CourseDto> _courses = [];
+    List<GradeRow> _rows = [];
+
+    protected override async Task InitializeAsync()
+    {
+        _courses = await Sender.Send(new GetOpenCoursesQuery());
+        _loading = false;
+    }
+
+    async Task OnCourseChanged(Guid id)
+    {
+        _selectedCourseId = id;
+        _rows.Clear();
+    }
+
+    async Task LoadEnrollments()
+    {
+        if (_selectedCourseId == Guid.Empty) return;
+        _rows.Clear();
+
+        var enrollments = await Sender.Send(new GetEnrollmentsByCourseQuery(_selectedCourseId));
+        var activeEnrollments = enrollments.Where(e => e.Status == "Active").ToList();
+
+        foreach (var e in activeEnrollments)
+        {
+            var grades = await Sender.Send(new GetGradesByEnrollmentQuery(e.EnrollmentId));
+            var existing = grades.FirstOrDefault();
+            _rows.Add(new GradeRow
+            {
+                EnrollmentId      = e.EnrollmentId,
+                ExistingGradeId   = existing?.GradeId,
+                ExistingScore     = existing?.Score,
+                Score             = existing?.Score ?? 0,
+                Comment           = existing?.Comment
+            });
+        }
+    }
+
+    async Task SaveAll()
+    {
+        if (!Guid.TryParse(_gradePeriodId, out var periodId))
+        { Snackbar.Add("Invalid Grade Period ID.", Severity.Warning); return; }
+
+        _saving = true;
+        int saved = 0, errors = 0;
+        try
+        {
+            foreach (var row in _rows)
+            {
+                try
+                {
+                    if (row.ExistingGradeId.HasValue)
+                        await Sender.Send(new UpdateGradeCommand(row.ExistingGradeId.Value, row.Score, row.Comment));
+                    else
+                        await Sender.Send(new RecordGradeCommand(row.EnrollmentId, periodId, row.Score, row.Comment));
+                    saved++;
+                }
+                catch { errors++; }
+            }
+            Snackbar.Add($"Saved {saved} grade(s){(errors > 0 ? $", {errors} error(s)" : "")}.",
+                         errors > 0 ? Severity.Warning : Severity.Success);
+        }
+        finally { _saving = false; }
+    }
+
+    class GradeRow
+    {
+        public Guid    EnrollmentId    { get; set; }
+        public Guid?   ExistingGradeId { get; set; }
+        public decimal? ExistingScore  { get; set; }
+        public decimal Score           { get; set; }
+        public string? Comment         { get; set; }
+    }
+}

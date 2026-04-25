@@ -1,0 +1,184 @@
+@page "/schedules"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender   Sender
+@inject ISnackbar Snackbar
+
+<PageTitle>Schedules</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Schedule Grid</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudNumericField @bind-Value="_month" Label="Month" Min="1" Max="12" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudNumericField @bind-Value="_year" Label="Year" Min="2000" Max="2100" />
+            </MudItem>
+            <MudItem xs="12" md="3" Class="d-flex align-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadGrid">Load</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_showCreateForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Add Schedule</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_form.CourseId" T="Guid" Label="Course" Required="true">
+                        @foreach (var c in _courses)
+                        {
+                            <MudSelectItem Value="c.CourseId">@c.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_form.TeacherUserId" T="Guid" Label="Teacher" Required="true">
+                        @foreach (var t in _teachers)
+                        {
+                            <MudSelectItem Value="t.UserId">@t.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_form.RoomIdText" Label="Room ID (Guid)" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect @bind-Value="_form.DayOfWeek" T="DayOfWeek" Label="Day" Required="true">
+                        @foreach (DayOfWeek day in Enum.GetValues<DayOfWeek>())
+                        {
+                            <MudSelectItem Value="day">@day</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudTimePicker @bind-Time="_form.StartTime" Label="Start" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudTimePicker @bind-Time="_form.EndTime" Label="End" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudDatePicker @bind-Date="_form.EffectiveFrom" Label="From" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudDatePicker @bind-Date="_form.EffectiveTo" Label="To" />
+                </MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateSchedule" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Save")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _showCreateForm = false)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_gridItems" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">@(new DateTime(_year, _month, 1).ToString("MMMM yyyy"))</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => _showCreateForm = true)" Disabled="_showCreateForm">Add</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Course</MudTh><MudTh>Day</MudTh><MudTh>Time</MudTh><MudTh>Room</MudTh><MudTh>Teacher</MudTh><MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@(context.CourseName ?? "—")</MudTd>
+            <MudTd>@context.DayOfWeek</MudTd>
+            <MudTd>@context.StartTime.ToString(@"hh\:mm") – @context.EndTime.ToString(@"hh\:mm")</MudTd>
+            <MudTd>@(context.RoomName ?? "—")</MudTd>
+            <MudTd>@(context.TeacherName ?? "—")</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                               OnClick="@(() => DeleteSchedule(context.ScheduleId))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No schedules for this period.</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    bool   _loading        = true;
+    bool   _showCreateForm = false;
+    bool   _saving         = false;
+    int    _month          = DateTime.Today.Month;
+    int    _year           = DateTime.Today.Year;
+    IReadOnlyList<ScheduleDto>  _gridItems = [];
+    IReadOnlyList<CourseDto>    _courses   = [];
+    IReadOnlyList<TeacherDto>   _teachers  = [];
+    ScheduleFormModel _form = new();
+
+    protected override async Task InitializeAsync()
+    {
+        _courses  = await Sender.Send(new GetOpenCoursesQuery());
+        _teachers = await Sender.Send(new GetAllTeachersQuery());
+        await LoadGrid();
+        _loading = false;
+    }
+
+    async Task LoadGrid()
+    {
+        _gridItems = await Sender.Send(new GetScheduleGridQuery(_month, _year));
+    }
+
+    async Task CreateSchedule()
+    {
+        if (_form.StartTime is null || _form.EndTime is null || _form.EffectiveFrom is null || _form.EffectiveTo is null)
+        { Snackbar.Add("All date/time fields are required.", Severity.Warning); return; }
+        if (!Guid.TryParse(_form.RoomIdText, out var roomId))
+        { Snackbar.Add("Invalid Room ID.", Severity.Warning); return; }
+
+        _saving = true;
+        try
+        {
+            await Sender.Send(new CreateScheduleCommand(
+                _form.CourseId,
+                roomId,
+                _form.TeacherUserId,
+                _form.DayOfWeek,
+                TimeOnly.FromTimeSpan(_form.StartTime.Value),
+                TimeOnly.FromTimeSpan(_form.EndTime.Value),
+                DateOnly.FromDateTime(_form.EffectiveFrom.Value),
+                DateOnly.FromDateTime(_form.EffectiveTo.Value)));
+            Snackbar.Add("Schedule created.", Severity.Success);
+            _showCreateForm = false;
+            _form = new();
+            await LoadGrid();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    async Task DeleteSchedule(Guid id)
+    {
+        try
+        {
+            await Sender.Send(new DeleteScheduleCommand(id));
+            Snackbar.Add("Schedule deleted.", Severity.Info);
+            await LoadGrid();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    class ScheduleFormModel
+    {
+        public Guid      CourseId      { get; set; }
+        public Guid      TeacherUserId { get; set; }
+        public string    RoomIdText    { get; set; } = "";
+        public DayOfWeek DayOfWeek     { get; set; } = DayOfWeek.Monday;
+        public TimeSpan? StartTime     { get; set; }
+        public TimeSpan? EndTime       { get; set; }
+        public DateTime? EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo   { get; set; }
+    }
+}

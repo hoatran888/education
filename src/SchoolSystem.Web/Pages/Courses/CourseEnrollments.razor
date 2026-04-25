@@ -1,0 +1,125 @@
+@page "/courses/{CourseId:guid}/enrollments"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender            Sender
+@inject ISnackbar          Snackbar
+@inject NavigationManager  Nav
+
+<PageTitle>Course Enrollments</PageTitle>
+<MudBreadcrumbs Items="_breadcrumbs" Class="mb-2" />
+<MudText Typo="Typo.h4" Class="mb-4">Enrollments — @_courseName</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_showEnrollForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Enroll Student</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_enrollStudentId" T="Guid" Label="Student" Required="true">
+                        @foreach (var s in _students)
+                        {
+                            <MudSelectItem Value="s.UserId">@s.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="EnrollStudent" Disabled="_saving">
+                    @(_saving ? "Enrolling…" : "Enroll")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="@(() => _showEnrollForm = false)">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_enrollments" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Enrollment List</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                       OnClick="@(() => _showEnrollForm = true)" Disabled="_showEnrollForm">Enroll Student</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Student ID</MudTh><MudTh>Enrolled On</MudTh><MudTh>Status</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.StudentUserId.ToString("N")[..8]…</MudTd>
+            <MudTd>@context.EnrolledDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.Status == "Active" ? Color.Success : Color.Default)">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                @if (context.Status == "Active")
+                {
+                    <MudButton Size="Size.Small" Color="Color.Warning" Variant="Variant.Text"
+                               OnClick="@(() => DropEnrollment(context.EnrollmentId))">Drop</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No enrollments found.</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    [Parameter] public Guid CourseId { get; set; }
+
+    bool   _loading         = true;
+    bool   _showEnrollForm  = false;
+    bool   _saving          = false;
+    string _courseName      = "";
+    Guid   _enrollStudentId;
+    IReadOnlyList<EnrollmentDto> _enrollments = [];
+    IReadOnlyList<StudentDto>    _students    = [];
+
+    List<BreadcrumbItem> _breadcrumbs =>
+    [
+        new("Courses", "/courses"),
+        new(_courseName, null, disabled: true),
+        new("Enrollments", null, disabled: true)
+    ];
+
+    protected override async Task InitializeAsync()
+    {
+        var course   = await Sender.Send(new GetCourseByIdQuery(CourseId));
+        _courseName  = course?.Name ?? CourseId.ToString();
+        _enrollments = await Sender.Send(new GetEnrollmentsByCourseQuery(CourseId));
+        _students    = await Sender.Send(new GetStudentsByGradeLevelQuery(0));
+        _loading     = false;
+    }
+
+    async Task EnrollStudent()
+    {
+        if (_enrollStudentId == Guid.Empty) return;
+        _saving = true;
+        try
+        {
+            await Sender.Send(new EnrollStudentCommand(CourseId, _enrollStudentId));
+            Snackbar.Add("Student enrolled.", Severity.Success);
+            _showEnrollForm = false;
+            _enrollments = await Sender.Send(new GetEnrollmentsByCourseQuery(CourseId));
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    async Task DropEnrollment(Guid enrollmentId)
+    {
+        try
+        {
+            await Sender.Send(new DropEnrollmentCommand(enrollmentId, "Dropped by admin"));
+            Snackbar.Add("Enrollment dropped.", Severity.Info);
+            _enrollments = await Sender.Send(new GetEnrollmentsByCourseQuery(CourseId));
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

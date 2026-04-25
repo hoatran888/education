@@ -1,0 +1,122 @@
+@page "/teachers"
+@attribute [Authorize]
+@inherits SchoolComponentBase
+@inject ISender   Sender
+@inject ISnackbar Snackbar
+
+<PageTitle>Teachers</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Teachers</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_showForm)
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">@(_editId is null ? "Add Teacher Profile" : "Edit Teacher Profile")</MudText>
+            <MudGrid>
+                @if (_editId is null)
+                {
+                    <MudItem xs="12" md="6">
+                        <MudSelect @bind-Value="_form.UserId" Label="User" Required="true">
+                            @foreach (var u in _users)
+                            {
+                                <MudSelectItem Value="u.UserId">@u.FullName (@u.Email)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Degree"         Label="Degree"         Required="true" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Specialization" Label="Specialization" /></MudItem>
+            </MudGrid>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="_saving">
+                    @(_saving ? "Saving…" : "Save")
+                </MudButton>
+                <MudButton Variant="Variant.Text" OnClick="CancelForm">Cancel</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudTable Items="_teachers" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Teacher List</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreate" Disabled="_showForm">Add Teacher</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>Degree</MudTh><MudTh>Specialization</MudTh><MudTh>Hire Date</MudTh><MudTh>Active</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.FullName</MudTd>
+            <MudTd>@context.Email</MudTd>
+            <MudTd>@context.Degree</MudTd>
+            <MudTd>@context.Specialization</MudTd>
+            <MudTd>@context.HireDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd><MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">@(context.IsActive ? "Active" : "Inactive")</MudChip></MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                               OnClick="@(() => OpenEdit(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><MudText>No teacher profiles found.</MudText></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    bool   _loading  = true;
+    bool   _showForm = false;
+    bool   _saving   = false;
+    Guid?  _editId;
+    IReadOnlyList<TeacherDto> _teachers = [];
+    IReadOnlyList<UserDto>    _users    = [];
+    TeacherFormModel _form = new();
+
+    protected override async Task InitializeAsync()
+    {
+        _teachers = await Sender.Send(new GetAllTeachersQuery());
+        _users    = await Sender.Send(new GetUsersByRoleQuery(UserRole.Teacher));
+        _loading  = false;
+    }
+
+    void OpenCreate() { _editId = null; _form = new(); _showForm = true; }
+
+    void OpenEdit(TeacherDto t)
+    {
+        _editId = t.TeacherProfileId;
+        _form   = new() { UserId = t.UserId, Degree = t.Degree, Specialization = t.Specialization };
+        _showForm = true;
+    }
+
+    void CancelForm() { _showForm = false; _editId = null; }
+
+    async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            if (_editId is null)
+                await Sender.Send(new CreateTeacherProfileCommand(_form.UserId, _form.Degree, _form.Specialization));
+            else
+                await Sender.Send(new UpdateTeacherProfileCommand(_editId.Value, _form.Degree, _form.Specialization));
+
+            Snackbar.Add("Saved.", Severity.Success);
+            _showForm = false;
+            _teachers = await Sender.Send(new GetAllTeachersQuery());
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    class TeacherFormModel
+    {
+        public Guid   UserId         { get; set; }
+        public string Degree         { get; set; } = "";
+        public string Specialization { get; set; } = "";
+    }
+}
