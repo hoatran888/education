@@ -26,11 +26,19 @@ public static class DependencyInjection
         services.AddDbContext<SchoolDataContext>(options =>
         {
             if (hasRealSqlServer && !isDev)
+            {
                 options.UseSqlServer(azureSql!);
+            }
             else
-                options.UseSqlite(
-                    configuration.GetConnectionString("SQLite")
-                    ?? "Data Source=schoolsystem.db");
+            {
+                // On Azure App Service, /home persists across deployments.
+                // Locally, fall back to schoolsystem.db in the working directory.
+                var defaultPath = environment?.IsProduction() == true
+                    ? "Data Source=/home/schoolsystem.db"
+                    : "Data Source=schoolsystem.db";
+                var connStr = configuration.GetConnectionString("SQLite") ?? defaultPath;
+                options.UseSqlite(connStr);
+            }
         });
 
         // ── Current school/user context from JWT claims ──────────

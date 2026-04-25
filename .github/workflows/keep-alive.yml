@@ -1,0 +1,23 @@
+name: Keep App Alive (Free Tier)
+
+# Pings the app every 10 minutes Mon-Fri 7am-6pm UTC
+# Prevents Azure Free tier from sleeping during school hours
+# Delete this file when you upgrade to a paid tier (it has "Always On")
+
+on:
+  schedule:
+    - cron: '*/10 7-18 * * 1-5'
+  workflow_dispatch:   # allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/health)
+          echo "Health check status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Warning: app returned $STATUS"
+          fi
