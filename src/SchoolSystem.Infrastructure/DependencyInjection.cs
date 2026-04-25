@@ -17,23 +17,20 @@ public static class DependencyInjection
         IHostEnvironment?       environment = null)
     {
         var isDev = environment?.IsDevelopment() ?? false;
+        var azureSql = configuration.GetConnectionString("AzureSQL");
+        var hasRealSqlServer = !string.IsNullOrWhiteSpace(azureSql)
+                               && !azureSql.Contains("your-server");
 
-        // ── EF Core DbContext (scoped per request) ───────────────
-        // Development: SQLite (no SQL Server install needed)
-        // Production:  Azure SQL Server
+        // Use SQLite when: explicitly in Development, OR no real SQL Server is configured.
+        // Use SQL Server only when a real AzureSQL connection string is present.
         services.AddDbContext<SchoolDataContext>(options =>
         {
-            if (isDev)
+            if (hasRealSqlServer && !isDev)
+                options.UseSqlServer(azureSql!);
+            else
                 options.UseSqlite(
                     configuration.GetConnectionString("SQLite")
                     ?? "Data Source=schoolsystem.db");
-            else
-            {
-                var connectionString = configuration.GetConnectionString("AzureSQL")
-                    ?? throw new InvalidOperationException(
-                        "Connection string 'AzureSQL' is not configured.");
-                options.UseSqlServer(connectionString);
-            }
         });
 
         // ── Current school/user context from JWT claims ──────────
