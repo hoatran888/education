@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SchoolSystem.Infrastructure.Data.Context;
 using SchoolSystem.Infrastructure.Data.LinqEntities;
@@ -15,10 +16,15 @@ public static class DatabaseSeeder
     public static async Task SeedAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
+        var env         = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         var db          = scope.ServiceProvider.GetRequiredService<SchoolDataContext>();
         var logger      = scope.ServiceProvider.GetRequiredService<ILogger<SchoolDataContext>>();
 
+        // Always run migrations so the schema is up-to-date on every deployment
         await db.Database.MigrateAsync();
+
+        // Dev seed data is only for local development — never seed in production
+        if (!env.IsDevelopment()) return;
 
         if (await db.Schools.AnyAsync()) return; // already seeded
 

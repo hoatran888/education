@@ -16,10 +16,10 @@ var kvUri = builder.Configuration["KeyVault:Uri"];
 if (!string.IsNullOrWhiteSpace(kvUri) && kvUri.StartsWith("https://") && !kvUri.Contains("your-keyvault"))
     builder.Configuration.AddAzureKeyVault(new Uri(kvUri), new DefaultAzureCredential());
 
-// ── Detect whether real B2C is configured ────────────────────────────────────
+// ── Detect whether real B2C is configured (ClientId must be a valid GUID) ───
 var b2cClientId = builder.Configuration["AzureAdB2C:ClientId"];
-var isRealB2C   = !string.IsNullOrWhiteSpace(b2cClientId)
-               && b2cClientId != "00000000-0000-0000-0000-000000000000";
+var isRealB2C   = Guid.TryParse(b2cClientId, out var parsedClientId)
+               && parsedClientId != Guid.Empty;
 
 // ── Application + Infrastructure ────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
@@ -46,7 +46,7 @@ if (isRealB2C)
 }
 else
 {
-    // Local dev: simple cookie auth with auto-login middleware
+    // Local dev: simple cookie auth with dev-login page
     builder.Services
         .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
         .AddCookie(options =>
@@ -61,21 +61,30 @@ else
 
 builder.Services.AddRazorPages();
 builder.Services.AddMudServices();
+builder.Services.AddHealthChecks();
 
 // ────────────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 
-// Auto-sign in dev admin when B2C is not configured
+// Dev-login redirect middleware — only active when B2C is not configured
 if (!isRealB2C)
     app.UseMiddleware<DevAutoLoginMiddleware>();
 
 app.UseAuthorization();
 app.MapControllers();
 app.MapBlazorHub();
+app.MapHealthChecks("/health");
 app.MapFallbackToPage("/_Host");
 
 await SchoolSystem.Infrastructure.Data.Seed.DatabaseSeeder.SeedAsync(app.Services);
