@@ -8,11 +8,9 @@ using SchoolSystem.Infrastructure;
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Azure Key Vault ─────────────────────────────────────────────────────────
-if (!builder.Environment.IsDevelopment())
-{
-    var keyVaultUri = new Uri(builder.Configuration["KeyVault:Uri"]!);
-    builder.Configuration.AddAzureKeyVault(keyVaultUri, new DefaultAzureCredential());
-}
+var kvUri = builder.Configuration["KeyVault:Uri"];
+if (!string.IsNullOrWhiteSpace(kvUri) && kvUri.StartsWith("https://") && !kvUri.Contains("your-keyvault"))
+    builder.Configuration.AddAzureKeyVault(new Uri(kvUri), new DefaultAzureCredential());
 
 // ── Application + Infrastructure ────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
