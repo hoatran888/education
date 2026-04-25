@@ -24,7 +24,8 @@
 
     <AuthorizeView Roles="SuperAdmin,Admin,Parent" Context="financeCtx">
         <MudNavGroup Title="Finance" Icon="@Icons.Material.Filled.AccountBalance" Expanded="true">
-            <MudNavLink Href="/invoices" Icon="@Icons.Material.Filled.Receipt">Invoices</MudNavLink>
+            <MudNavLink Href="/invoices"  Icon="@Icons.Material.Filled.Receipt">Invoices</MudNavLink>
+            <MudNavLink Href="/payments"  Icon="@Icons.Material.Filled.Payment">Payments</MudNavLink>
         </MudNavGroup>
     </AuthorizeView>
 </MudNavMenu>

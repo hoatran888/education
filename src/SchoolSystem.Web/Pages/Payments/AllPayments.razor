@@ -1,0 +1,131 @@
+@page "/payments"
+@attribute [Authorize(Roles = "SuperAdmin,Admin,Parent")]
+@inherits SchoolComponentBase
+@inject ISender            Sender
+@inject ISnackbar          Snackbar
+@inject NavigationManager  Nav
+
+<PageTitle>Payments</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Payments</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <AuthorizeView Roles="SuperAdmin,Admin" Context="adminCtx">
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" md="5">
+                    <MudSelect @bind-Value="_filterParentId" T="Guid" Label="Filter by Parent">
+                        <MudSelectItem Value="Guid.Empty">— Select a parent —</MudSelectItem>
+                        @foreach (var p in _parents)
+                        {
+                            <MudSelectItem Value="p.UserId">@p.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="2" Class="d-flex align-end">
+                    <MudButton Variant="Variant.Outlined" OnClick="LoadPayments">Search</MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </AuthorizeView>
+
+    <MudTable Items="_payments" Hover="true" Striped="true" Elevation="2">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Payment History</MudText>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Date</MudTh>
+            <MudTh>Amount</MudTh>
+            <MudTh>Method</MudTh>
+            <MudTh>Reference</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Invoice</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.PaymentDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd>@context.Currency @context.Amount.ToString("F2")</MudTd>
+            <MudTd>@context.Method</MudTd>
+            <MudTd>@(string.IsNullOrEmpty(context.Reference) ? "—" : context.Reference)</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.Status == "Confirmed" ? Color.Success : Color.Warning)">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Text"
+                           OnClick="@(() => Nav.NavigateTo($"/payments/{context.InvoiceId}"))">
+                    View Invoice
+                </MudButton>
+            </MudTd>
+            <MudTd>
+                @if (context.Status == "Pending")
+                {
+                    <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text"
+                               OnClick="@(() => ConfirmPayment(context.PaymentId))">Confirm</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText>
+                @(_isAdmin ? "Select a parent above to view payments." : "No payments found.")
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    bool   _loading   = true;
+    bool   _isAdmin;
+    Guid   _filterParentId = Guid.Empty;
+    IReadOnlyList<PaymentDto> _payments = [];
+    IReadOnlyList<UserDto>    _parents  = [];
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    protected override async Task InitializeAsync()
+    {
+        if (AuthStateTask is not null)
+        {
+            var state = await AuthStateTask;
+            _isAdmin = state.User.IsInRole("Admin") || state.User.IsInRole("SuperAdmin");
+
+            if (_isAdmin)
+            {
+                _parents = await Sender.Send(new GetUsersByRoleQuery(UserRole.Parent));
+            }
+            else
+            {
+                // Parent sees their own payments automatically
+                var myId = Guid.Parse(
+                    state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? state.User.FindFirst("sub")!.Value);
+                _payments = await Sender.Send(new GetPaymentsByParentQuery(myId));
+            }
+        }
+
+        _loading = false;
+    }
+
+    async Task LoadPayments()
+    {
+        if (_filterParentId == Guid.Empty) return;
+        _payments = await Sender.Send(new GetPaymentsByParentQuery(_filterParentId));
+    }
+
+    async Task ConfirmPayment(Guid paymentId)
+    {
+        try
+        {
+            await Sender.Send(new ConfirmPaymentCommand(paymentId));
+            Snackbar.Add("Payment confirmed.", Severity.Success);
+            await LoadPayments();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}
