@@ -4,13 +4,12 @@
 @code {
     protected override void OnInitialized()
     {
-        var b2cClientId = Configuration["AzureAdB2C:ClientId"];
-        var isRealB2C   = !string.IsNullOrWhiteSpace(b2cClientId)
-                       && b2cClientId != "00000000-0000-0000-0000-000000000000";
+        var clientId    = Configuration["AzureAd:ClientId"];
+        var isRealEntra = Guid.TryParse(clientId, out var id) && id != Guid.Empty;
 
         var returnUrl = Uri.EscapeDataString(Navigation.Uri);
 
-        if (isRealB2C)
+        if (isRealEntra)
             Navigation.NavigateTo($"MicrosoftIdentity/Account/SignIn?returnUrl={returnUrl}", forceLoad: true);
         else
             Navigation.NavigateTo($"/dev-login?returnUrl={returnUrl}", forceLoad: true);

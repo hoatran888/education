@@ -16,10 +16,11 @@ var kvUri = builder.Configuration["KeyVault:Uri"];
 if (!string.IsNullOrWhiteSpace(kvUri) && kvUri.StartsWith("https://") && !kvUri.Contains("your-keyvault"))
     builder.Configuration.AddAzureKeyVault(new Uri(kvUri), new DefaultAzureCredential());
 
-// ── Detect whether real B2C is configured (ClientId must be a valid GUID) ───
-var b2cClientId = builder.Configuration["AzureAdB2C:ClientId"];
-var isRealB2C   = Guid.TryParse(b2cClientId, out var parsedClientId)
-               && parsedClientId != Guid.Empty;
+// ── Detect whether real Entra External ID is configured ─────────────────────
+// ClientId must be a real GUID (not all-zeros placeholder)
+var entraClientId = builder.Configuration["AzureAd:ClientId"];
+var isRealEntra   = Guid.TryParse(entraClientId, out var parsedId)
+                 && parsedId != Guid.Empty;
 
 // ── Application + Infrastructure ────────────────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
@@ -31,12 +32,12 @@ builder.Services.AddScoped<ICurrentSchoolContext>(
     sp => sp.GetRequiredService<CircuitUserService>());
 
 // ── Authentication ────────────────────────────────────────────────────────────
-if (isRealB2C)
+if (isRealEntra)
 {
-    // Production: full Azure AD B2C
+    // Production: Microsoft Entra External ID (replaces Azure AD B2C)
     builder.Services
         .AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
-        .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAdB2C"));
+        .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
 
     builder.Services.AddControllersWithViews()
         .AddMicrosoftIdentityUI();
@@ -77,8 +78,8 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 
-// Dev-login redirect middleware — only active when B2C is not configured
-if (!isRealB2C)
+// Dev-login redirect middleware — only active when Entra is not configured
+if (!isRealEntra)
     app.UseMiddleware<DevAutoLoginMiddleware>();
 
 app.UseAuthorization();
