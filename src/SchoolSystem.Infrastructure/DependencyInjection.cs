@@ -31,12 +31,24 @@ public static class DependencyInjection
             }
             else
             {
-                // On Azure App Service, /home persists across deployments.
-                // Locally, fall back to schoolsystem.db in the working directory.
-                var defaultPath = environment?.IsProduction() == true
-                    ? "Data Source=/home/schoolsystem.db"
-                    : "Data Source=schoolsystem.db";
-                var connStr = configuration.GetConnectionString("SQLite") ?? defaultPath;
+                // Use absolute path so the .db file location is predictable
+                // regardless of the working directory used to launch the app.
+                // Azure App Service: /home persists across deployments.
+                // Local dev: next to the Web project's content root.
+                string defaultConnStr;
+                if (environment?.IsProduction() == true)
+                {
+                    defaultConnStr = "Data Source=/home/schoolsystem.db";
+                }
+                else
+                {
+                    var dbPath = Path.Combine(
+                        environment?.ContentRootPath ?? AppContext.BaseDirectory,
+                        "schoolsystem.db");
+                    defaultConnStr = $"Data Source={dbPath}";
+                }
+
+                var connStr = configuration.GetConnectionString("SQLite") ?? defaultConnStr;
                 options.UseSqlite(connStr);
             }
         });
