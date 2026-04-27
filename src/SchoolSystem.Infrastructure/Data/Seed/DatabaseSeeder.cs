@@ -20,11 +20,18 @@ public static class DatabaseSeeder
         var db          = scope.ServiceProvider.GetRequiredService<SchoolDataContext>();
         var logger      = scope.ServiceProvider.GetRequiredService<ILogger<SchoolDataContext>>();
 
-        // Always run migrations so the schema is up-to-date on every deployment
-        await db.Database.MigrateAsync();
-
-        // Dev seed data is only for local development — never seed in production
-        if (!env.IsDevelopment()) return;
+        if (env.IsDevelopment())
+        {
+            // SQLite: EnsureCreated is simpler and avoids provider type conflicts.
+            // Migrations are SQL Server-typed and won't run cleanly on SQLite.
+            await db.Database.EnsureCreatedAsync();
+        }
+        else
+        {
+            // SQL Server (production): apply pending migrations on every deploy
+            await db.Database.MigrateAsync();
+            return; // no dev seed data in production
+        }
 
         if (await db.Schools.AnyAsync()) return; // already seeded
 
