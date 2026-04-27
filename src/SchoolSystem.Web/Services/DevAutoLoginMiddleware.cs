@@ -1,7 +1,7 @@
 namespace SchoolSystem.Web.Services;
 
 /// <summary>
-/// Redirects unauthenticated requests to /dev-login when B2C is not configured.
+/// Redirects unauthenticated requests to /account/login when Entra is not configured.
 /// </summary>
 public class DevAutoLoginMiddleware
 {
@@ -15,13 +15,12 @@ public class DevAutoLoginMiddleware
         {
             var path = context.Request.Path.Value ?? "";
 
-            // Let the dev-login controller handle its own routes
-            if (!path.StartsWith("/dev-login", StringComparison.OrdinalIgnoreCase) &&
-                !path.StartsWith("/_blazor",  StringComparison.OrdinalIgnoreCase) &&
+            if (!path.StartsWith("/account",    StringComparison.OrdinalIgnoreCase) &&
+                !path.StartsWith("/_blazor",    StringComparison.OrdinalIgnoreCase) &&
                 !path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase))
             {
                 var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
-                context.Response.Redirect($"/dev-login?returnUrl={returnUrl}");
+                context.Response.Redirect($"/account/login?returnUrl={returnUrl}");
                 return;
             }
         }

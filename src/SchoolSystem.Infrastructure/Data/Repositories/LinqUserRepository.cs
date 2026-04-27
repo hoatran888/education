@@ -64,6 +64,15 @@ public class LinqUserRepository
         }
     }
 
+    public async Task SetPasswordAsync(Guid userId, string passwordHash, CancellationToken ct = default)
+    {
+        // Try change tracker first (entity may already be loaded in this scope)
+        var tracked = Table.Local.FirstOrDefault(e => e.UserId == userId);
+        var entity  = tracked ?? await Table.FirstOrDefaultAsync(e => e.UserId == userId, ct);
+        if (entity is not null)
+            entity.PasswordHash = passwordHash;
+    }
+
     public void Update(User user)
     {
         _context.Update(MapToEntity(user));
@@ -115,21 +124,23 @@ public class LinqUserRepository
 
     protected override UserEntity MapToEntity(User u) => new()
     {
-        UserId      = u.UserId,
-        SchoolId    = u.SchoolId,
-        B2CObjectId = u.B2CObjectId,
-        FirstName   = u.FirstName,
-        LastName    = u.LastName,
-        Sex         = (int)u.Sex,
-        Email       = u.Email,
-        Phone       = u.Phone,
-        Street      = u.Address.Street,
-        City        = u.Address.City,
-        State       = u.Address.State,
-        ZipCode     = u.Address.ZipCode,
-        Country     = u.Address.Country,
-        PhotoUrl    = u.PhotoUrl,
-        IsActive    = u.IsActive,
-        CreatedAt   = u.CreatedAt
+        UserId       = u.UserId,
+        SchoolId     = u.SchoolId,
+        B2CObjectId  = u.B2CObjectId,
+        FirstName    = u.FirstName,
+        LastName     = u.LastName,
+        Sex          = (int)u.Sex,
+        Email        = u.Email,
+        Phone        = u.Phone,
+        Street       = u.Address.Street,
+        City         = u.Address.City,
+        State        = u.Address.State,
+        ZipCode      = u.Address.ZipCode,
+        Country      = u.Address.Country,
+        PhotoUrl     = u.PhotoUrl,
+        IsActive     = u.IsActive,
+        CreatedAt    = u.CreatedAt,
+        // Preserve the existing password hash — domain entity doesn't carry it
+        PasswordHash = Table.Local.FirstOrDefault(e => e.UserId == u.UserId)?.PasswordHash
     };
 }

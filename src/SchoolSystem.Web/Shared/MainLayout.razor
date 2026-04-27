@@ -16,13 +16,13 @@
                 <MudText Typo="Typo.body2" Class="mr-2">@context.User.Identity?.Name</MudText>
                 @if (_isDevMode)
                 {
-                    <MudButton Href="/dev-login/signout"
-                               Variant="Variant.Text" Color="Color.Inherit">Switch User</MudButton>
+                    <MudButton Href="/account/logout"
+                               Variant="Variant.Text" Color="Color.Inherit">Sign Out</MudButton>
                 }
                 else
                 {
                     <MudButton Href="MicrosoftIdentity/Account/SignOut"
-                               Variant="Variant.Text" Color="Color.Inherit">Sign out</MudButton>
+                               Variant="Variant.Text" Color="Color.Inherit">Sign Out</MudButton>
                 }
             </Authorized>
         </AuthorizeView>

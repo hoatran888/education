@@ -41,6 +41,9 @@ public static class DependencyInjection
             }
         });
 
+        // ── Password hashing ────────────────────────────────────
+        services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
+
         // ── Current school/user context from JWT claims ──────────
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentSchoolContext, CurrentSchoolContext>();

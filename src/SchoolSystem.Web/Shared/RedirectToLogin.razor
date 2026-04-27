@@ -12,6 +12,6 @@
         if (isRealEntra)
             Navigation.NavigateTo($"MicrosoftIdentity/Account/SignIn?returnUrl={returnUrl}", forceLoad: true);
         else
-            Navigation.NavigateTo($"/dev-login?returnUrl={returnUrl}", forceLoad: true);
+            Navigation.NavigateTo($"/account/login?returnUrl={returnUrl}", forceLoad: true);
     }
 }

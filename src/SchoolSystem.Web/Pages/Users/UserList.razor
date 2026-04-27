@@ -16,28 +16,53 @@ else
     @if (_showForm)
     {
         <MudPaper Class="pa-4 mb-4" Elevation="2">
-            <MudText Typo="Typo.h6" Class="mb-3">Create User</MudText>
+            <MudText Typo="Typo.h6" Class="mb-3">Add User</MudText>
             <MudGrid>
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.FirstName"   Label="First Name"   Required="true" /></MudItem>
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.LastName"    Label="Last Name"    Required="true" /></MudItem>
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Email"       Label="Email"        Required="true" /></MudItem>
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Phone"       Label="Phone" /></MudItem>
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.B2CObjectId" Label="B2C Object ID" Required="true" /></MudItem>
                 <MudItem xs="12" md="6">
-                    <MudSelect @bind-Value="_form.Sex" Label="Sex" Required="true">
+                    <MudTextField @bind-Value="_form.FirstName" Label="First Name" Required="true" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_form.LastName" Label="Last Name" Required="true" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_form.Email" Label="Email" InputType="InputType.Email" Required="true" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_form.Password" Label="Password" InputType="InputType.Password"
+                                  Required="true" HelperText="Minimum 6 characters" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_form.Role" T="UserRole" Label="Role" Required="true">
+                        @foreach (var r in Enum.GetValues<UserRole>())
+                        {
+                            <MudSelectItem Value="r">@r</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect @bind-Value="_form.Sex" T="Sex" Label="Sex">
                         @foreach (var s in Enum.GetValues<Sex>())
                         {
                             <MudSelectItem Value="s">@s</MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Street"  Label="Street" /></MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_form.City"    Label="City" /></MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_form.State"   Label="State" /></MudItem>
-                <MudItem xs="12" md="4"><MudTextField @bind-Value="_form.Country" Label="Country" /></MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_form.Phone" Label="Phone" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_form.Street" Label="Street" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_form.City" Label="City" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="_form.Country" Label="Country" />
+                </MudItem>
             </MudGrid>
             <MudStack Row="true" Class="mt-3" Spacing="2">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateUser" Disabled="_saving">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                           OnClick="CreateUser" Disabled="_saving">
                     @(_saving ? "Saving…" : "Create")
                 </MudButton>
                 <MudButton Variant="Variant.Text" OnClick="@(() => _showForm = false)">Cancel</MudButton>
@@ -45,36 +70,48 @@ else
         </MudPaper>
     }
 
-    <MudTable Items="_users" Hover="true" Striped="true" Elevation="2"
-              Filter="FilterFunc" @bind-SelectedItem="_selected">
+    <MudTable Items="FilteredUsers" Hover="true" Striped="true" Elevation="2">
         <ToolBarContent>
             <MudText Typo="Typo.h6">User List</MudText>
             <MudSpacer />
-            <MudSelect @bind-Value="_roleFilter" Label="Filter by Role" Style="width:180px" Class="mr-4"
-                       Clearable="true">
+            <MudSelect @bind-Value="_roleFilter" T="UserRole?" Label="Filter by Role"
+                       Style="width:180px" Class="mr-4" Clearable="true">
                 @foreach (var r in Enum.GetValues<UserRole>())
                 {
                     <MudSelectItem Value="(UserRole?)r">@r</MudSelectItem>
                 }
             </MudSelect>
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add"
+                       StartIcon="@Icons.Material.Filled.PersonAdd"
                        OnClick="@(() => _showForm = true)" Disabled="_showForm">Add User</MudButton>
         </ToolBarContent>
         <HeaderContent>
-            <MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>Roles</MudTh><MudTh>Active</MudTh><MudTh>Actions</MudTh>
+            <MudTh>Name</MudTh>
+            <MudTh>Email</MudTh>
+            <MudTh>Roles</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Actions</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd>@context.FullName</MudTd>
             <MudTd>@context.Email</MudTd>
-            <MudTd>@string.Join(", ", context.Roles)</MudTd>
-            <MudTd><MudChip T="string" Color="@(context.IsActive ? Color.Success : Color.Default)" Size="Size.Small">@(context.IsActive ? "Active" : "Inactive")</MudChip></MudTd>
+            <MudTd>
+                @foreach (var role in context.Roles)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="@RoleColor(role)" Class="mr-1">@role</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.IsActive ? Color.Success : Color.Default)">
+                    @(context.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
             <MudTd>
                 @if (context.IsActive)
                 {
                     <MudIconButton Icon="@Icons.Material.Filled.PersonOff" Size="Size.Small"
-                                   Title="Deactivate"
-                                   OnClick="@(() => Deactivate(context.UserId))" />
+                                   Title="Deactivate" OnClick="@(() => Deactivate(context.UserId))" />
                 }
             </MudTd>
         </RowTemplate>
@@ -87,37 +124,42 @@ else
     bool      _showForm   = false;
     bool      _saving     = false;
     UserRole? _roleFilter;
-    UserDto?  _selected;
     IReadOnlyList<UserDto> _users = [];
     UserFormModel _form = new();
 
+    IEnumerable<UserDto> FilteredUsers => _roleFilter.HasValue
+        ? _users.Where(u => u.Roles.Contains(_roleFilter.Value.ToString()))
+        : _users;
+
     protected override async Task InitializeAsync()
     {
-        await Reload();
+        _users   = await Sender.Send(new GetAllUsersQuery());
         _loading = false;
     }
 
-    async Task Reload()
-    {
-        _users = _roleFilter.HasValue
-            ? await Sender.Send(new GetUsersByRoleQuery(_roleFilter.Value))
-            : await Sender.Send(new GetUsersByRoleQuery(UserRole.Admin)); // placeholder
-    }
-
-    bool FilterFunc(UserDto u) =>
-        !_roleFilter.HasValue || u.Roles.Contains(_roleFilter.Value.ToString());
-
     async Task CreateUser()
     {
+        if (string.IsNullOrWhiteSpace(_form.FirstName) ||
+            string.IsNullOrWhiteSpace(_form.LastName)  ||
+            string.IsNullOrWhiteSpace(_form.Email)     ||
+            string.IsNullOrWhiteSpace(_form.Password))
+        {
+            Snackbar.Add("First name, last name, email and password are required.", Severity.Warning);
+            return;
+        }
+
         _saving = true;
         try
         {
-            await Sender.Send(new CreateUserCommand(_form.FirstName, _form.LastName,
-                _form.B2CObjectId, _form.Sex, _form.Email, _form.Phone,
-                _form.Street, _form.City, _form.State, "", _form.Country));
-            Snackbar.Add("User created.", Severity.Success);
+            await Sender.Send(new CreateUserCommand(
+                _form.FirstName, _form.LastName, _form.Sex,
+                _form.Email, _form.Password, _form.Role,
+                _form.Phone, _form.Street, _form.City, "", "", _form.Country));
+
+            Snackbar.Add($"{_form.FirstName} {_form.LastName} created successfully.", Severity.Success);
             _showForm = false;
-            await Reload();
+            _form     = new();
+            _users    = await Sender.Send(new GetAllUsersQuery());
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
         finally { _saving = false; }
@@ -129,22 +171,31 @@ else
         {
             await Sender.Send(new DeactivateUserCommand(userId));
             Snackbar.Add("User deactivated.", Severity.Info);
-            await Reload();
+            _users = await Sender.Send(new GetAllUsersQuery());
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
     }
 
+    static Color RoleColor(string role) => role switch
+    {
+        "SuperAdmin" or "Admin" => Color.Primary,
+        "Teacher"               => Color.Success,
+        "Student"               => Color.Secondary,
+        "Parent"                => Color.Warning,
+        _                       => Color.Default
+    };
+
     class UserFormModel
     {
-        public string    FirstName   { get; set; } = "";
-        public string    LastName    { get; set; } = "";
-        public string    B2CObjectId { get; set; } = "";
-        public Sex       Sex         { get; set; } = Sex.Male;
-        public string    Email       { get; set; } = "";
-        public string    Phone       { get; set; } = "";
-        public string    Street      { get; set; } = "";
-        public string    City        { get; set; } = "";
-        public string    State       { get; set; } = "";
-        public string    Country     { get; set; } = "";
+        public string   FirstName { get; set; } = "";
+        public string   LastName  { get; set; } = "";
+        public string   Email     { get; set; } = "";
+        public string   Password  { get; set; } = "";
+        public UserRole Role      { get; set; } = UserRole.Student;
+        public Sex      Sex       { get; set; } = Sex.Male;
+        public string   Phone     { get; set; } = "";
+        public string   Street    { get; set; } = "";
+        public string   City      { get; set; } = "";
+        public string   Country   { get; set; } = "";
     }
 }

@@ -15,7 +15,8 @@ public class UserEntity
     public string  State       { get; set; } = string.Empty;
     public string  ZipCode     { get; set; } = string.Empty;
     public string  Country     { get; set; } = string.Empty;
-    public string? PhotoUrl    { get; set; }
+    public string? PhotoUrl     { get; set; }
+    public string? PasswordHash { get; set; }
     public bool    IsActive    { get; set; }
     public DateTime CreatedAt  { get; set; }
 

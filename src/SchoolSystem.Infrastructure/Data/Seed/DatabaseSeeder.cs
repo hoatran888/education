@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SchoolSystem.Infrastructure.Data.Context;
 using SchoolSystem.Infrastructure.Data.LinqEntities;
+using SchoolSystem.Infrastructure.Services;
 
 namespace SchoolSystem.Infrastructure.Data.Seed;
 
@@ -18,6 +19,7 @@ public static class DatabaseSeeder
         using var scope = services.CreateScope();
         var env         = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         var db          = scope.ServiceProvider.GetRequiredService<SchoolDataContext>();
+        var hasher      = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var logger      = scope.ServiceProvider.GetRequiredService<ILogger<SchoolDataContext>>();
 
         if (env.IsDevelopment())
@@ -51,6 +53,7 @@ public static class DatabaseSeeder
         var room1Id        = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000012");
         var room2Id        = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000013");
         var now            = DateTime.UtcNow;
+        var defaultPwHash  = hasher.Hash("School123!");
 
         db.Schools.Add(new SchoolEntity
         {
@@ -68,13 +71,13 @@ public static class DatabaseSeeder
         });
 
         db.Users.AddRange(
-            new UserEntity { UserId = adminUserId, SchoolId = schoolId, B2CObjectId = "dev-admin", FirstName = "Admin",   LastName = "User",    Email = "admin@greenwood.edu",   Phone = "555-0101", Street = "123 Main St",    City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now },
-            new UserEntity { UserId = teacher1Id,  SchoolId = schoolId, B2CObjectId = "dev-t1",    FirstName = "Alice",   LastName = "Johnson", Email = "alice@greenwood.edu",   Phone = "555-0102", Street = "456 Oak Ave",    City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now },
-            new UserEntity { UserId = teacher2Id,  SchoolId = schoolId, B2CObjectId = "dev-t2",    FirstName = "Bob",     LastName = "Williams",Email = "bob@greenwood.edu",     Phone = "555-0103", Street = "789 Pine Rd",    City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now },
-            new UserEntity { UserId = student1Id,  SchoolId = schoolId, B2CObjectId = "dev-s1",    FirstName = "Charlie", LastName = "Brown",   Email = "charlie@greenwood.edu", Phone = "555-0104", Street = "101 Elm St",     City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now },
-            new UserEntity { UserId = student2Id,  SchoolId = schoolId, B2CObjectId = "dev-s2",    FirstName = "Diana",   LastName = "Prince",  Email = "diana@greenwood.edu",   Phone = "555-0105", Street = "202 Maple Ave",  City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now },
-            new UserEntity { UserId = student3Id,  SchoolId = schoolId, B2CObjectId = "dev-s3",    FirstName = "Edward",  LastName = "Norton",  Email = "edward@greenwood.edu",  Phone = "555-0106", Street = "303 Cedar Blvd", City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now },
-            new UserEntity { UserId = parent1Id,   SchoolId = schoolId, B2CObjectId = "dev-p1",    FirstName = "Frank",   LastName = "Brown",   Email = "frank@example.com",     Phone = "555-0107", Street = "101 Elm St",     City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now }
+            new UserEntity { UserId = adminUserId, SchoolId = schoolId, B2CObjectId = "dev-admin", FirstName = "Admin",   LastName = "User",    Email = "admin@greenwood.edu",   Phone = "555-0101", Street = "123 Main St",    City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now, PasswordHash = defaultPwHash },
+            new UserEntity { UserId = teacher1Id,  SchoolId = schoolId, B2CObjectId = "dev-t1",    FirstName = "Alice",   LastName = "Johnson", Email = "alice@greenwood.edu",   Phone = "555-0102", Street = "456 Oak Ave",    City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now, PasswordHash = defaultPwHash },
+            new UserEntity { UserId = teacher2Id,  SchoolId = schoolId, B2CObjectId = "dev-t2",    FirstName = "Bob",     LastName = "Williams",Email = "bob@greenwood.edu",     Phone = "555-0103", Street = "789 Pine Rd",    City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now, PasswordHash = defaultPwHash },
+            new UserEntity { UserId = student1Id,  SchoolId = schoolId, B2CObjectId = "dev-s1",    FirstName = "Charlie", LastName = "Brown",   Email = "charlie@greenwood.edu", Phone = "555-0104", Street = "101 Elm St",     City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now, PasswordHash = defaultPwHash },
+            new UserEntity { UserId = student2Id,  SchoolId = schoolId, B2CObjectId = "dev-s2",    FirstName = "Diana",   LastName = "Prince",  Email = "diana@greenwood.edu",   Phone = "555-0105", Street = "202 Maple Ave",  City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now, PasswordHash = defaultPwHash },
+            new UserEntity { UserId = student3Id,  SchoolId = schoolId, B2CObjectId = "dev-s3",    FirstName = "Edward",  LastName = "Norton",  Email = "edward@greenwood.edu",  Phone = "555-0106", Street = "303 Cedar Blvd", City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now, PasswordHash = defaultPwHash },
+            new UserEntity { UserId = parent1Id,   SchoolId = schoolId, B2CObjectId = "dev-p1",    FirstName = "Frank",   LastName = "Brown",   Email = "frank@example.com",     Phone = "555-0107", Street = "101 Elm St",     City = "Springfield", State = "IL", ZipCode = "62701", Country = "USA", IsActive = true, CreatedAt = now, PasswordHash = defaultPwHash }
         );
 
         db.UserRoles.AddRange(
